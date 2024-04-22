@@ -8,6 +8,7 @@ package tcmpr
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"io"
 	"slices"
@@ -19,17 +20,27 @@ func rwErrWrapper(n any, err error) error {
 	return err
 }
 
-func writeCompressed(w *bufio.Writer, counter int, char byte) {
+func writeCompressed(w *bufio.Writer, counter int, char byte) error {
 	// fixed bug: handle edge case of counter being bigger than a byte (c>255): split
 	// it up into multiple writes of COUNT BYTE all writing at most 255, thus
 	// we would split 614 c as follows: 255c255c104c
-	for counter > 255 {
-		counter -= 255
-		w.WriteByte(255)
-		w.WriteByte(char)
+	if counter > 255 {
+		// compute the times we have to write byte max (255)
+		var m = counter / 255
+		// compute the remaining count of bytes to write
+		var r = counter % 255
+		// repeat byte repetition with correct byte
+		err := rwErrWrapper(w.Write(bytes.Repeat([]byte{255, char}, m)))
+		if err != nil {
+			return err
+		}
+		counter = r
 	}
-	w.WriteByte(byte(counter))
-	w.WriteByte(char)
+	err := w.WriteByte(byte(counter))
+	if err != nil {
+		return err
+	}
+	return w.WriteByte(char)
 }
 
 // Compress compresses data passed in via r into w
@@ -53,7 +64,10 @@ func Compress(r io.Reader, w io.Writer) error {
 			if errors.Is(err, io.EOF) {
 				// hitting eof should just stop us iterating and we of course
 				// need to write the last buffered byte and its counter
-				writeCompressed(bufW, counter, lc)
+				err := writeCompressed(bufW, counter, lc)
+				if err != nil {
+					return err
+				}
 				break
 			} else {
 				return err
@@ -61,7 +75,10 @@ func Compress(r io.Reader, w io.Writer) error {
 		}
 
 		if b != lc {
-			writeCompressed(bufW, counter, lc)
+			err := writeCompressed(bufW, counter, lc)
+			if err != nil {
+				return err
+			}
 			lc = b
 			counter = 1
 		} else {
