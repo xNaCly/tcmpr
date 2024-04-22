@@ -15,20 +15,61 @@ import (
 
 var magicNum = [...]byte{0x74, 0x63, 0x6d, 0x70, 0x72, 0x31, 0x0A}
 
-func writeErrWrapper(n any, err error) error {
+func rwErrWrapper(n any, err error) error {
 	return err
+}
+
+func writeCompressed(w *bufio.Writer, counter int, char byte) {
+	// fixed bug: handle edge case of counter being bigger than a byte (c>255): split
+	// it up into multiple writes of COUNT BYTE all writing at most 255, thus
+	// we would split 614 c as follows: 255c255c104c
+	for counter > 255 {
+		counter -= 255
+		w.WriteByte(255)
+		w.WriteByte(char)
+	}
+	w.WriteByte(byte(counter))
+	w.WriteByte(char)
 }
 
 // Compress compresses data passed in via r into w
 func Compress(r io.Reader, w io.Writer) error {
 	bufR := bufio.NewReader(r)
 	bufW := bufio.NewWriter(w)
-	err := writeErrWrapper(bufW.Write(magicNum[:]))
+	err := rwErrWrapper(bufW.Write(magicNum[:]))
 	if err != nil {
 		return err
 	}
 
-	err = writeErrWrapper(bufR.WriteTo(bufW))
+	lc, err := bufR.ReadByte()
+	if err != nil {
+		return err
+	}
+
+	var counter int = 1
+	for {
+		b, err := bufR.ReadByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				// hitting eof should just stop us iterating and we of course
+				// need to write the last buffered byte and its counter
+				writeCompressed(bufW, counter, lc)
+				break
+			} else {
+				return err
+			}
+		}
+
+		if b != lc {
+			writeCompressed(bufW, counter, lc)
+			lc = b
+			counter = 1
+		} else {
+			counter++
+		}
+	}
+
+	err = rwErrWrapper(bufR.WriteTo(bufW))
 	if err != nil {
 		return err
 	}
@@ -53,7 +94,7 @@ func Decompress(r io.Reader, w io.Writer) error {
 		return errors.New("reader is not tcmpr compressed")
 	}
 
-	err = writeErrWrapper(bufR.WriteTo(bufW))
+	err = rwErrWrapper(bufR.WriteTo(bufW))
 	if err != nil {
 		return err
 	}
