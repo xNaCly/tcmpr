@@ -110,10 +110,23 @@ func Decompress(r io.Reader, w io.Writer) error {
 	if !slices.Equal(magicBuf, magicNum[:]) {
 		return errors.New("reader is not tcmpr compressed")
 	}
-
-	err = rwErrWrapper(bufR.WriteTo(bufW))
-	if err != nil {
-		return err
+	for {
+		c, err := bufR.ReadByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+		b, err := bufR.ReadByte()
+		if err != nil {
+			return err
+		}
+		buf := make([]byte, c)
+		for i := byte(0); i < c; i++ {
+			buf[i] = b
+		}
+		bufW.Write(buf)
 	}
 	return bufW.Flush()
 }

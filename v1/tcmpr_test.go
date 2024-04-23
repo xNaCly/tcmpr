@@ -45,12 +45,10 @@ func TestSimple(t *testing.T) {
 		fmt.Printf("exp: %#+v\nout: %#+v\n len in: %d, len out: %d\n", test.exp, b, len([]byte(test.in)), len(b))
 		assert.Equal(t, test.exp, outBuf.Bytes())
 
-		// TODO: impl decompression
-
-		// outBuf2 := bytes.Buffer{}
-		// err = Decompress(&outBuf, &outBuf2)
-		// assert.NoError(t, err, "Failed to decompress buffer")
-		// assert.Equal(t, []byte(test.in), outBuf2.Bytes())
+		outBuf2 := bytes.Buffer{}
+		err = Decompress(&outBuf, &outBuf2)
+		assert.NoError(t, err, "Failed to decompress buffer")
+		assert.Equal(t, []byte(test.in), outBuf2.Bytes())
 	}
 }
 
@@ -74,12 +72,10 @@ func TestEdge(t *testing.T) {
 
 		assert.Equal(t, test.exp, outBuf.Bytes())
 
-		// TODO: impl decompression
-
-		// outBuf2 := bytes.Buffer{}
-		// err = Decompress(&outBuf, &outBuf2)
-		// assert.NoError(t, err, "Failed to decompress buffer")
-		// assert.Equal(t, []byte(test.in), outBuf2.Bytes())
+		outBuf2 := bytes.Buffer{}
+		err = Decompress(&outBuf, &outBuf2)
+		assert.NoError(t, err, "Failed to decompress buffer")
+		assert.Equal(t, []byte(test.in), outBuf2.Bytes())
 	}
 
 }
