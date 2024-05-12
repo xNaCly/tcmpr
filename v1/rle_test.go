@@ -1,4 +1,4 @@
-package tcmpr
+package v1
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ func debugTest(in *bytes.Buffer) {
 	fmt.Printf("%#+v\n", b)
 }
 
-func TestSimple(t *testing.T) {
+func TestRLE(t *testing.T) {
 	input := []struct {
 		in  string
 		exp []byte
@@ -52,7 +52,7 @@ func TestSimple(t *testing.T) {
 	}
 }
 
-func TestEdge(t *testing.T) {
+func TestEdgeRLE(t *testing.T) {
 	input := []struct {
 		name string
 		in   string

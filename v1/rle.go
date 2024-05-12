@@ -1,10 +1,10 @@
 // tcmpr1 is a rudimentary run-length lossless compression algorithm (see [1]).
 // It works by merging similar blocks of data, thus reducing the total size of
 // the buffer. tcmpr compressed blocks of data use the 0x74, 0x63, 0x6d, 0x70,
-// 0x72, 0x31, 0x0A magic number.
+// 0x72, 0x31, 0x0A magic number (tcmpr1).
 //
 // [1]: https://en.wikipedia.org/wiki/Run-length_encoding
-package tcmpr
+package v1
 
 import (
 	"bufio"
