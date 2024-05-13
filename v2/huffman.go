@@ -15,17 +15,49 @@ import (
 
 var magicNum = [...]byte{0x74, 0x63, 0x6d, 0x70, 0x72, 0x32, 0x0A}
 
+type huffmanNode struct {
+	k, f byte
+}
+
+func (h *huffmanNode) String() string {
+	return fmt.Sprintf("0x%x [%c]: %d", h.k, h.k, h.f)
+}
+
+type prioQueue []*huffmanNode
+
+func (p *prioQueue) push(b *huffmanNode) {
+	*p = append(*p, b)
+}
+
+func (p *prioQueue) pull() *huffmanNode {
+	if len(*p) == 0 {
+		return nil
+	}
+	var lowest *huffmanNode = nil
+	var index int = 0
+	for i, v := range *p {
+		if lowest == nil || v.f < lowest.f {
+			lowest = v
+			index = i
+		}
+	}
+
+	(*p)[index] = (*p)[len(*p)-1]
+	*p = (*p)[:len(*p)-1]
+	return lowest
+}
+
 type huffman struct {
-	// TODO: think about serializing the huffmann coding tree and prefixing the serialized bytes with it.
-	key byte
-	l   *huffman
-	r   *huffman
+	key       byte
+	frequency byte
+	l         *huffman
+	r         *huffman
 }
 
 func createTree(r *bufio.Reader) (*huffman, error) {
 	b := &bytes.Buffer{}
 	tee := bufio.NewReader(io.TeeReader(r, b))
-	freq := map[byte]int{}
+	freq := map[byte]byte{}
 	for {
 		c, err := tee.ReadByte()
 		if err != nil {
@@ -41,12 +73,23 @@ func createTree(r *bufio.Reader) (*huffman, error) {
 			freq[c] = 1
 		}
 	}
-	fmt.Println(freq)
+	p := &prioQueue{}
+	for k, v := range freq {
+		p.push(&huffmanNode{k, v})
+	}
+	for {
+		e := p.pull()
+		if e == nil {
+			break
+		}
+		fmt.Println(e)
+	}
 	return &huffman{}, nil
 }
 
 func Compress(r io.Reader, w io.Writer) error {
-	h, err := createTree(bufio.NewReader(r))
+	rr := bufio.NewReader(r)
+	h, err := createTree(rr)
 	if err != nil {
 		return err
 	}

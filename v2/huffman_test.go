@@ -9,6 +9,26 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestPriorityQueue(t *testing.T) {
+	p := prioQueue{}
+	p.push(&huffmanNode{k: 0x0, f: 0x12})
+	p.push(&huffmanNode{k: 0x1, f: 0x3})
+	p.push(&huffmanNode{k: 0xA, f: 0x25})
+	assert.Len(t, p, 3)
+	h := p.pull()
+	assert.Equal(t, h.k, byte(0x1))
+	assert.Equal(t, h.f, byte(0x3))
+	assert.Len(t, p, 2)
+	h = p.pull()
+	assert.Equal(t, h.k, byte(0x0))
+	assert.Equal(t, h.f, byte(0x12))
+	assert.Len(t, p, 1)
+	h = p.pull()
+	assert.Equal(t, h.k, byte(0xA))
+	assert.Equal(t, h.f, byte(0x25))
+	assert.Len(t, p, 0)
+}
+
 func TestHuffman(t *testing.T) {
 	input := []struct {
 		in  string
