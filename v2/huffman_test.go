@@ -11,21 +11,21 @@ import (
 
 func TestPriorityQueue(t *testing.T) {
 	p := prioQueue{}
-	p.push(&huffmanNode{k: 0x0, f: 0x12})
-	p.push(&huffmanNode{k: 0x1, f: 0x3})
-	p.push(&huffmanNode{k: 0xA, f: 0x25})
+	p.push(&huffman{key: 0x0, frequency: 0x12})
+	p.push(&huffman{key: 0x1, frequency: 0x3})
+	p.push(&huffman{key: 0xA, frequency: 0x25})
 	assert.Len(t, p, 3)
 	h := p.pull()
-	assert.Equal(t, h.k, byte(0x1))
-	assert.Equal(t, h.f, byte(0x3))
+	assert.Equal(t, h.key, byte(0x1))
+	assert.Equal(t, h.frequency, byte(0x3))
 	assert.Len(t, p, 2)
 	h = p.pull()
-	assert.Equal(t, h.k, byte(0x0))
-	assert.Equal(t, h.f, byte(0x12))
+	assert.Equal(t, h.key, byte(0x0))
+	assert.Equal(t, h.frequency, byte(0x12))
 	assert.Len(t, p, 1)
 	h = p.pull()
-	assert.Equal(t, h.k, byte(0xA))
-	assert.Equal(t, h.f, byte(0x25))
+	assert.Equal(t, h.key, byte(0xA))
+	assert.Equal(t, h.frequency, byte(0x25))
 	assert.Len(t, p, 0)
 }
 
