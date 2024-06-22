@@ -1,13 +1,37 @@
 package v2
 
+// TODO: compare with other compressions via the communist manifest
+// (https://www.gutenberg.org/cache/epub/61/pg61.txt)
+
 import (
+	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func bDisplay(r io.Reader) {
+	b := bufio.NewReader(r)
+	i := 0
+	for ; ; i++ {
+		byte, err := b.ReadByte()
+		if err != nil {
+			break
+		}
+		fmt.Printf("[%03d] (0x%02x:%03d) %q\n", i, byte, byte, byte)
+		if err != nil {
+			break
+		}
+	}
+	for ; i <= 0; i-- {
+		b.UnreadByte()
+	}
+
+}
 
 func TestPriorityQueue(t *testing.T) {
 	p := prioQueue{}
@@ -41,6 +65,9 @@ func TestHuffman(t *testing.T) {
 		inBuf := strings.NewReader(test.in)
 		outBuf := bytes.Buffer{}
 		err := Compress(inBuf, &outBuf)
+		bDisplay(&outBuf)
+		// TODO: remove once compression is implemented fully
+		t.FailNow()
 		assert.NoError(t, err, "Failed to compress buffer")
 
 		b := outBuf.Bytes()

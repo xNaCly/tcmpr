@@ -1,10 +1,10 @@
 /*
 tcmpr2 is a huffman coding lossless compression algorithm (see [1]).
 
-tcmpr compressed blocks of data use the 0x74, 0x63, 0x6d, 0x70, 0x72, 0x32,
-0x0A magic number (tcmpr2). The resulting format is represented as follows:
+tcmpr compressed blocks of data use the 0x74, 0x0A magic number (t). The
+resulting format is represented as follows:
 
-	<magic number><map frequency keys>0x0<map frequency values>0x0<encoded data>
+	<magic number><map frequency keys>0xA<map frequency values>0xA<encoded data>
 
 [1]: https://en.wikipedia.org/wiki/Huffman_coding
 */
@@ -18,7 +18,7 @@ import (
 	"io"
 )
 
-var magicNum = [...]byte{0x74, 0x63, 0x6d, 0x70, 0x72, 0x32, 0x0A}
+var magicNum = [...]byte{0x74, 0x0A}
 
 type huffman struct {
 	key       byte
@@ -56,7 +56,8 @@ type frequency struct {
 }
 
 // Write dumps the frequency map into w, keys as a list of bytes, values as a
-// list of bytes, the separator is the 0x0 byte
+// list of bytes, the separator between the list of keys/bytes and their
+// values/occurences, is the 0xA byte
 func (f *frequency) Dump(w io.Writer) error {
 	keys := make([]byte, 0, len(f.M))
 	values := make([]byte, 0, len(f.M))
@@ -68,7 +69,7 @@ func (f *frequency) Dump(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	_, err = w.Write([]byte{0x0})
+	_, err = w.Write([]byte{0xA})
 	if err != nil {
 		return err
 	}
@@ -137,7 +138,7 @@ func Compress(r io.Reader, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	_, err = w.Write([]byte{0x0})
+	_, err = w.Write([]byte{0xA})
 	if err != nil {
 		return err
 	}
