@@ -30,7 +30,6 @@ func bDisplay(r io.Reader) {
 	for ; i <= 0; i-- {
 		b.UnreadByte()
 	}
-
 }
 
 func TestPriorityQueue(t *testing.T) {
@@ -51,6 +50,20 @@ func TestPriorityQueue(t *testing.T) {
 	assert.Equal(t, h.key, byte(0xA))
 	assert.Equal(t, h.frequency, byte(0x25))
 	assert.Len(t, p, 0)
+}
+
+func TestFrequency(t *testing.T) {
+	in := bufio.NewReader(strings.NewReader("BCAADDDCCACACAC"))
+	f := frequency{}
+	assert.NoError(t, f.compute(in))
+	m := make(map[byte]byte, len(f.M))
+	for k, v := range f.M {
+		m[k] = v
+	}
+	buf := &bytes.Buffer{}
+	assert.NoError(t, f.serialize(buf))
+	assert.NoError(t, f.deserialize(bufio.NewReader(buf)))
+	assert.EqualValues(t, m, f.M)
 }
 
 func TestHuffman(t *testing.T) {
