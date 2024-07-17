@@ -60,6 +60,7 @@ func TestFrequency(t *testing.T) {
 	for k, v := range f.M {
 		m[k] = v
 	}
+	fmt.Println(m)
 	buf := &bytes.Buffer{}
 	assert.NoError(t, f.serialize(buf))
 	assert.NoError(t, f.deserialize(bufio.NewReader(buf)))

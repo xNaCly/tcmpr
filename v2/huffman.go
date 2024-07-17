@@ -71,11 +71,11 @@ func (f *frequency) serialize(w io.Writer) error {
 		keys = append(keys, k)
 		values = append(values, v)
 	}
-	_, err := w.Write(keys)
+	_, err := w.Write([]byte{byte(len(keys))})
 	if err != nil {
 		return err
 	}
-	_, err = w.Write([]byte{0xA})
+	_, err = w.Write(keys)
 	if err != nil {
 		return err
 	}
@@ -88,31 +88,34 @@ func (f *frequency) serialize(w io.Writer) error {
 
 // deserialize reads bytes in form exported by serialize and forms a frequency struct
 func (f *frequency) deserialize(r *bufio.Reader) error {
+	lr, err := r.ReadByte()
+	if err != nil {
+		return err
+	}
+	l := int(lr)
 	f.M = make(map[byte]byte, 64)
-	// preallocation to 64, idk if thats a good value
 	keys := make([]byte, 0, 64)
 	values := make([]byte, 0, 64)
-	workingKeys := true
-	var err error
-	for {
+
+	for i := 0; i < l; i++ {
 		b, err := r.ReadByte()
 		if err != nil {
 			break
 		}
-		if b == 0xA {
-			workingKeys = false
-			continue
-		}
-
-		if workingKeys {
-			keys = append(keys, b)
-		} else {
-			values = append(values, b)
-		}
+		keys = append(keys, b)
 	}
+	for i := 0; i < l; i++ {
+		b, err := r.ReadByte()
+		if err != nil {
+			break
+		}
+		values = append(values, b)
+	}
+
 	if len(keys) != len(values) {
 		return errors.New("key and value list not equally sized")
 	}
+
 	for i := 0; i < len(keys); i++ {
 		f.M[keys[i]] = values[i]
 	}
@@ -169,10 +172,6 @@ func Compress(r io.Reader, w io.Writer) error {
 		return nil
 	}
 	err = f.serialize(w)
-	if err != nil {
-		return err
-	}
-	_, err = w.Write([]byte{0xA})
 	if err != nil {
 		return err
 	}
