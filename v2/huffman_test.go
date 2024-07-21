@@ -77,8 +77,7 @@ func TestTree(t *testing.T) {
 	in := bufio.NewReader(strings.NewReader("BCAADDDCCACACAC"))
 	f := frequency{}
 	assert.NoError(t, f.compute(in))
-	tree, err := f.tree()
-	assert.NoError(t, err)
+	tree := f.tree()
 	fmt.Println(tDisplay(tree))
 }
 

@@ -144,7 +144,7 @@ func (f *frequency) compute(r *bufio.Reader) error {
 	return nil
 }
 
-func (f *frequency) tree() (*huffman, error) {
+func (f *frequency) tree() *huffman {
 	p := &prioQueue{}
 	for k, v := range f.M {
 		p.push(&huffman{
@@ -172,7 +172,7 @@ func (f *frequency) tree() (*huffman, error) {
 			R:         r,
 		})
 	}
-	return root, nil
+	return root
 }
 
 func Compress(r io.Reader, w io.Writer) error {
