@@ -21,10 +21,11 @@ import (
 var magicNum = [...]byte{0x74, 0x0A}
 
 type huffman struct {
-	key       byte
-	frequency byte
-	l         *huffman
-	r         *huffman
+	hasKey    bool
+	Key       byte
+	Frequency byte
+	L         *huffman
+	R         *huffman
 }
 
 // walk walks the tree until b is found, returns the encoded value for b and true if found
@@ -46,7 +47,7 @@ func (p *prioQueue) pull() *huffman {
 	var lowest *huffman = nil
 	var index int = 0
 	for i, v := range *p {
-		if lowest == nil || v.frequency < lowest.frequency {
+		if lowest == nil || v.Frequency < lowest.Frequency {
 			lowest = v
 			index = i
 		}
@@ -143,23 +144,35 @@ func (f *frequency) compute(r *bufio.Reader) error {
 	return nil
 }
 
-func createTree(freq map[byte]byte) (*huffman, error) {
+func (f *frequency) tree() (*huffman, error) {
 	p := &prioQueue{}
-	for k, v := range freq {
+	for k, v := range f.M {
 		p.push(&huffman{
-			key:       k,
-			frequency: v,
+			hasKey:    true,
+			Key:       k,
+			Frequency: v,
 		})
 	}
+	var root *huffman
 	for {
-		e := p.pull()
-		if e == nil {
+		if len(*p) == 1 {
+			root = p.pull()
+		}
+		l := p.pull()
+		if l == nil {
 			break
 		}
+		r := p.pull()
+		if r == nil {
+			break
+		}
+		p.push(&huffman{
+			Frequency: l.Frequency + r.Frequency,
+			L:         l,
+			R:         r,
+		})
 	}
-	// TODO: say youre going to make a tree and then just tree all over the
-	// place
-	return &huffman{}, nil
+	return root, nil
 }
 
 func Compress(r io.Reader, w io.Writer) error {
@@ -175,7 +188,7 @@ func Compress(r io.Reader, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	h, err := createTree(f.M)
+	h, err := f.tree()
 	if err != nil {
 		return err
 	}

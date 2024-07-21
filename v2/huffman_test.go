@@ -6,6 +6,7 @@ package v2
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -13,6 +14,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
+
+func tDisplay(tree *huffman) string {
+	out, _ := json.MarshalIndent(tree, "", "\t")
+	return string(out)
+}
 
 func bDisplay(r io.Reader) {
 	b := bufio.NewReader(r)
@@ -34,21 +40,21 @@ func bDisplay(r io.Reader) {
 
 func TestPriorityQueue(t *testing.T) {
 	p := prioQueue{}
-	p.push(&huffman{key: 0x0, frequency: 0x12})
-	p.push(&huffman{key: 0x1, frequency: 0x3})
-	p.push(&huffman{key: 0xA, frequency: 0x25})
+	p.push(&huffman{Key: 0x0, Frequency: 0x12})
+	p.push(&huffman{Key: 0x1, Frequency: 0x3})
+	p.push(&huffman{Key: 0xA, Frequency: 0x25})
 	assert.Len(t, p, 3)
 	h := p.pull()
-	assert.Equal(t, h.key, byte(0x1))
-	assert.Equal(t, h.frequency, byte(0x3))
+	assert.Equal(t, h.Key, byte(0x1))
+	assert.Equal(t, h.Frequency, byte(0x3))
 	assert.Len(t, p, 2)
 	h = p.pull()
-	assert.Equal(t, h.key, byte(0x0))
-	assert.Equal(t, h.frequency, byte(0x12))
+	assert.Equal(t, h.Key, byte(0x0))
+	assert.Equal(t, h.Frequency, byte(0x12))
 	assert.Len(t, p, 1)
 	h = p.pull()
-	assert.Equal(t, h.key, byte(0xA))
-	assert.Equal(t, h.frequency, byte(0x25))
+	assert.Equal(t, h.Key, byte(0xA))
+	assert.Equal(t, h.Frequency, byte(0x25))
 	assert.Len(t, p, 0)
 }
 
@@ -65,6 +71,15 @@ func TestFrequency(t *testing.T) {
 	assert.NoError(t, f.serialize(buf))
 	assert.NoError(t, f.deserialize(bufio.NewReader(buf)))
 	assert.EqualValues(t, m, f.M)
+}
+
+func TestTree(t *testing.T) {
+	in := bufio.NewReader(strings.NewReader("BCAADDDCCACACAC"))
+	f := frequency{}
+	assert.NoError(t, f.compute(in))
+	tree, err := f.tree()
+	assert.NoError(t, err)
+	fmt.Println(tDisplay(tree))
 }
 
 func TestHuffman(t *testing.T) {
