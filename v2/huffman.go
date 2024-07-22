@@ -28,9 +28,18 @@ type huffman struct {
 	R         *huffman
 }
 
-// walk walks the tree until b is found, returns the encoded value for b and true if found
+// walk walks the tree until b with f is found, returns the encoded value for b
+// and true if found
 func (h *huffman) walk(b byte) (byte, bool) {
-	// TODO:
+	// PERFORMANCE: maybe cache this lookup
+	curNode := h
+	for {
+		if curNode == nil {
+			break
+		} else if curNode.hasKey && curNode.Key == b {
+			panic("todo")
+		}
+	}
 	return 0x0, false
 }
 
@@ -188,10 +197,7 @@ func Compress(r io.Reader, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	h, err := f.tree()
-	if err != nil {
-		return err
-	}
+	h := f.tree()
 	fmt.Println(h)
 	// panic("Not implemented")
 	return nil
