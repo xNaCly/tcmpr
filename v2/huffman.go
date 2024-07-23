@@ -1,7 +1,7 @@
 /*
 tcmpr2 is a huffman coding lossless compression algorithm (see [1]).
 
-tcmpr compressed blocks of data use the 0x74, 0x0A magic number (t). The
+tcmpr compressed blocks of data use the 0x74, 0x0 magic number (t). The
 resulting format is represented as follows:
 
 	<magic number><map frequency keys>0xA<map frequency values>0xA<encoded data>
@@ -18,7 +18,7 @@ import (
 	"io"
 )
 
-var magicNum = [...]byte{0x74, 0x0A}
+var magicNum = [...]byte{0x74, 0x0}
 
 type huffman struct {
 	hasKey    bool
@@ -30,17 +30,10 @@ type huffman struct {
 
 // walk walks the tree until b with f is found, returns the encoded value for b
 // and true if found
-func (h *huffman) walk(b byte) (byte, bool) {
-	// PERFORMANCE: maybe cache this lookup
-	curNode := h
-	for {
-		if curNode == nil {
-			break
-		} else if curNode.hasKey && curNode.Key == b {
-			panic("todo")
-		}
-	}
-	return 0x0, false
+func walk(tree *huffman) [256]int8 {
+	cache := [256]int8{}
+	// TODO:
+	return cache
 }
 
 type prioQueue []*huffman
@@ -98,23 +91,23 @@ func (f *frequency) serialize(w io.Writer) error {
 
 // deserialize reads bytes in form exported by serialize and forms a frequency struct
 func (f *frequency) deserialize(r *bufio.Reader) error {
-	lr, err := r.ReadByte()
+	lengthRaw, err := r.ReadByte()
 	if err != nil {
 		return err
 	}
-	l := int(lr)
+	length := int(lengthRaw)
 	f.M = make(map[byte]byte, 64)
 	keys := make([]byte, 0, 64)
 	values := make([]byte, 0, 64)
 
-	for i := 0; i < l; i++ {
+	for i := 0; i < length; i++ {
 		b, err := r.ReadByte()
 		if err != nil {
 			break
 		}
 		keys = append(keys, b)
 	}
-	for i := 0; i < l; i++ {
+	for i := 0; i < length; i++ {
 		b, err := r.ReadByte()
 		if err != nil {
 			break
