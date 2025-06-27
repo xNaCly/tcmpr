@@ -11,6 +11,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -28,7 +29,11 @@ func bDisplay(r io.Reader) {
 		if err != nil {
 			break
 		}
-		fmt.Printf("[%03d] (0x%02x:%03d) %q\n", i, byte, byte, byte)
+		if byte < unicode.MaxASCII {
+			fmt.Printf("[%03d] (0x%02x:%03d) 0b%08b %c\n", i, byte, byte, byte, byte)
+		} else {
+			fmt.Printf("[%03d] (0x%02x:%03d) 0b%08b\n", i, byte, byte, byte)
+		}
 	}
 	for ; i <= 0; i-- {
 		b.UnreadByte()

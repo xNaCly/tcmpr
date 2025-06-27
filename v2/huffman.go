@@ -14,10 +14,12 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
+
+	"github.com/xnacly/tcmpr/v2/bitwriter"
 )
 
+// []{'t', 0x0}
 var magicNum = [...]byte{0x74, 0x0}
 
 type huffman struct {
@@ -34,12 +36,12 @@ func dfs(table map[byte][]bool, node *huffman, path []bool) {
 	}
 
 	if node.hasKey {
-		table[node.Key] = append(table[node.Key], path...)
+		table[node.Key] = append([]bool{}, path...)
 		return
 	}
 
 	dfs(table, node.L, append(path, false))
-	dfs(table, node.L, append(path, true))
+	dfs(table, node.R, append(path, true))
 }
 
 // walk computes a table of byte encodings, thus making huffman access O(1)
@@ -109,9 +111,9 @@ func (f *frequency) deserialize(r *bufio.Reader) error {
 		return err
 	}
 	length := int(lengthRaw)
-	f.M = make(map[byte]byte, 64)
-	keys := make([]byte, 0, 64)
-	values := make([]byte, 0, 64)
+	f.M = make(map[byte]byte, length)
+	keys := make([]byte, 0, length)
+	values := make([]byte, 0, length)
 
 	for i := 0; i < length; i++ {
 		b, err := r.ReadByte()
@@ -184,6 +186,7 @@ func (f *frequency) tree() *huffman {
 	return p.pull()
 }
 
+// Compresses bytes in r into w
 func Compress(r io.Reader, w io.Writer) error {
 	w.Write(magicNum[:])
 	b := &bytes.Buffer{}
@@ -197,15 +200,16 @@ func Compress(r io.Reader, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	h := f.tree()
-	fmt.Println(h)
-	// panic("Not implemented")
+	h := f.tree().walk()
+	bWriter := bitwriter.New(w)
+	for _, b := range b.Bytes() {
+		path := h[b]
+		bWriter.WriteBits(path)
+	}
+	bWriter.Flush()
 	return nil
 }
 
 func Decompress(r io.Reader, w io.Writer) error {
-	// TODO: check magic num
-	// TODO: compute frequency map from byte array
-	// TODO: decode data using the tree
-	panic("Not implemented")
+	return nil
 }
