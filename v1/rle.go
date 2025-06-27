@@ -16,7 +16,7 @@ import (
 
 var magicNum = [...]byte{0x74, 0x63, 0x6d, 0x70, 0x72, 0x31, 0x0A}
 
-func rwErrWrapper(n any, err error) error {
+func rwErrWrapper(_ any, err error) error {
 	return err
 }
 

@@ -29,9 +29,6 @@ func bDisplay(r io.Reader) {
 			break
 		}
 		fmt.Printf("[%03d] (0x%02x:%03d) %q\n", i, byte, byte, byte)
-		if err != nil {
-			break
-		}
 	}
 	for ; i <= 0; i-- {
 		b.UnreadByte()
@@ -79,6 +76,14 @@ func TestTree(t *testing.T) {
 	assert.NoError(t, f.compute(in))
 	tree := f.tree()
 	fmt.Println(tDisplay(tree))
+}
+
+func TestTreeTable(t *testing.T) {
+	in := bufio.NewReader(strings.NewReader("BCAADDDCCACACAC"))
+	f := frequency{}
+	assert.NoError(t, f.compute(in))
+	table := f.tree().walk()
+	fmt.Printf("%#+v\n", table)
 }
 
 func TestHuffman(t *testing.T) {

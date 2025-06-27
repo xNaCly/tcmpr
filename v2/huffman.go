@@ -28,12 +28,25 @@ type huffman struct {
 	R         *huffman
 }
 
-// walk walks the tree until b with f is found, returns the encoded value for b
-// and true if found
-func walk(tree *huffman) [256]int8 {
-	cache := [256]int8{}
-	// TODO:
-	return cache
+func dfs(table map[byte][]bool, node *huffman, path []bool) {
+	if node == nil {
+		return
+	}
+
+	if node.hasKey {
+		table[node.Key] = append(table[node.Key], path...)
+		return
+	}
+
+	dfs(table, node.L, append(path, false))
+	dfs(table, node.L, append(path, true))
+}
+
+// walk computes a table of byte encodings, thus making huffman access O(1)
+func (h *huffman) walk() map[byte][]bool {
+	table := make(map[byte][]bool, 256)
+	dfs(table, h, nil)
+	return table
 }
 
 type prioQueue []*huffman
@@ -155,26 +168,20 @@ func (f *frequency) tree() *huffman {
 			Frequency: v,
 		})
 	}
-	var root *huffman
-	for {
-		if len(*p) == 1 {
-			root = p.pull()
-		}
+
+	for len(*p) > 1 {
 		l := p.pull()
-		if l == nil {
-			break
-		}
 		r := p.pull()
-		if r == nil {
-			break
-		}
+
 		p.push(&huffman{
+			hasKey:    false,
 			Frequency: l.Frequency + r.Frequency,
 			L:         l,
 			R:         r,
 		})
 	}
-	return root
+
+	return p.pull()
 }
 
 func Compress(r io.Reader, w io.Writer) error {
