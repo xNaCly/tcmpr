@@ -13,19 +13,21 @@ package v2
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/xnacly/tcmpr/v2/bitwriter"
 )
 
 // []{'t', 0x0}
-var magicNum = [...]byte{0x74, 0x0}
+var magicNum []byte = []byte{0x74, 0x0}
 
 type huffman struct {
 	hasKey    bool
 	Key       byte
-	Frequency byte
+	Frequency int32
 	L         *huffman
 	R         *huffman
 }
@@ -36,7 +38,11 @@ func dfs(table map[byte][]bool, node *huffman, path []bool) {
 	}
 
 	if node.hasKey {
-		table[node.Key] = append([]bool{}, path...)
+		if len(path) == 0 {
+			table[node.Key] = []bool{false}
+		} else {
+			table[node.Key] = append([]bool{}, path...)
+		}
 		return
 	}
 
@@ -76,15 +82,14 @@ func (p *prioQueue) pull() *huffman {
 }
 
 type frequency struct {
-	M map[byte]byte
+	M map[byte]int32
 }
 
 // serialize the frequency map into w, keys as a list of bytes, values as a
-// list of bytes, the separator between the list of keys/bytes and their
-// values/occurences, is the 0xA byte
+// list of bytes
 func (f *frequency) serialize(w io.Writer) error {
 	keys := make([]byte, 0, len(f.M))
-	values := make([]byte, 0, len(f.M))
+	values := make([]int32, 0, len(f.M))
 	for k, v := range f.M {
 		keys = append(keys, k)
 		values = append(values, v)
@@ -97,9 +102,10 @@ func (f *frequency) serialize(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	_, err = w.Write(values)
-	if err != nil {
-		return err
+	for _, v := range values {
+		if err := binary.Write(w, binary.BigEndian, v); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -111,38 +117,31 @@ func (f *frequency) deserialize(r *bufio.Reader) error {
 		return err
 	}
 	length := int(lengthRaw)
-	f.M = make(map[byte]byte, length)
+	f.M = make(map[byte]int32, length)
 	keys := make([]byte, 0, length)
-	values := make([]byte, 0, length)
 
 	for i := 0; i < length; i++ {
 		b, err := r.ReadByte()
 		if err != nil {
-			break
+			return err
 		}
 		keys = append(keys, b)
 	}
+
 	for i := 0; i < length; i++ {
-		b, err := r.ReadByte()
-		if err != nil {
-			break
+		var b int32
+		if err := binary.Read(r, binary.BigEndian, &b); err != nil {
+			return err
 		}
-		values = append(values, b)
+		f.M[keys[i]] = b
 	}
 
-	if len(keys) != len(values) {
-		return errors.New("key and value list not equally sized")
-	}
-
-	for i := 0; i < len(keys); i++ {
-		f.M[keys[i]] = values[i]
-	}
-	return err
+	return nil
 }
 
 // computes the frequency map from a list of bytes
 func (f *frequency) compute(r *bufio.Reader) error {
-	f.M = map[byte]byte{}
+	f.M = map[byte]int32{}
 	for {
 		c, err := r.ReadByte()
 		if err != nil {
@@ -211,5 +210,22 @@ func Compress(r io.Reader, w io.Writer) error {
 }
 
 func Decompress(r io.Reader, w io.Writer) error {
+	buf := bufio.NewReader(r)
+
+	shouldBeMagicNum, err := buf.ReadBytes(magicNum[len(magicNum)-1])
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(magicNum[:], shouldBeMagicNum) {
+		return fmt.Errorf("Magic number incorrect %#+v vs %#+v", shouldBeMagicNum, magicNum)
+	}
+
+	f := frequency{}
+	if err := f.deserialize(buf); err != nil {
+		return err
+	}
+
+	// tree := f.tree()
+
 	return nil
 }
