@@ -41,8 +41,6 @@ func TestRLE(t *testing.T) {
 		err := Compress(inBuf, &outBuf)
 		assert.NoError(t, err, "Failed to compress buffer")
 
-		b := outBuf.Bytes()
-		fmt.Printf("exp: %#+v\nout: %#+v\n len in: %d, len out: %d\n", test.exp, b, len([]byte(test.in)), len(b))
 		assert.Equal(t, test.exp, outBuf.Bytes())
 
 		outBuf2 := bytes.Buffer{}
@@ -69,9 +67,7 @@ func TestEdgeRLE(t *testing.T) {
 		outBuf := bytes.Buffer{}
 		err := Compress(inBuf, &outBuf)
 		assert.NoError(t, err, "Failed to compress buffer")
-
 		assert.Equal(t, test.exp, outBuf.Bytes())
-
 		outBuf2 := bytes.Buffer{}
 		err = Decompress(&outBuf, &outBuf2)
 		assert.NoError(t, err, "Failed to decompress buffer")
