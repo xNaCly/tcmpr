@@ -2,14 +2,15 @@ package bitwriter
 
 import "io"
 
+// BitWriter abstracts writing bits into a io.Writer, handling padding via BitWriter.Flush
 type BitWriter struct {
 	inner          io.Writer
 	curByteBuilder byte
-	bitCount       int
+	bitCount       int // amount of bits written already, resets upon hitting 8
 }
 
-func New(w io.Writer) BitWriter {
-	return BitWriter{
+func New(w io.Writer) *BitWriter {
+	return &BitWriter{
 		inner:          w,
 		curByteBuilder: 0,
 		bitCount:       0,
@@ -43,10 +44,6 @@ func (w *BitWriter) WriteBits(bits []bool) error {
 
 func (w *BitWriter) Flush() error {
 	if w.bitCount > 0 {
-		for w.bitCount < 8 {
-			w.curByteBuilder <<= 1
-			w.bitCount++
-		}
 		if _, err := w.inner.Write([]byte{w.curByteBuilder}); err != nil {
 			return err
 		}

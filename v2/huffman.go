@@ -4,7 +4,11 @@ tcmpr2 is a huffman coding lossless compression algorithm (see [1]).
 tcmpr compressed blocks of data use the 0x74, 0x0 magic number (t). The
 resulting format is represented as follows:
 
-	<magic number><map frequency keys>0xA<map frequency values>0xA<encoded data>
+	<magic number>
+	<list of frequency keys>
+	<list frequency values>
+	<length of original input>
+	<encoded data>
 
 [1]: https://en.wikipedia.org/wiki/Huffman_coding
 */
@@ -14,10 +18,13 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 
+	"github.com/xnacly/tcmpr/v2/bitreader"
 	"github.com/xnacly/tcmpr/v2/bitwriter"
 )
 
@@ -25,7 +32,7 @@ import (
 var magicNum []byte = []byte{0x74, 0x0}
 
 type huffman struct {
-	hasKey    bool
+	HasKey    bool
 	Key       byte
 	Frequency int32
 	L         *huffman
@@ -37,7 +44,7 @@ func dfs(table map[byte][]bool, node *huffman, path []bool) {
 		return
 	}
 
-	if node.hasKey {
+	if node.HasKey {
 		if len(path) == 0 {
 			table[node.Key] = []bool{false}
 		} else {
@@ -50,11 +57,41 @@ func dfs(table map[byte][]bool, node *huffman, path []bool) {
 	dfs(table, node.R, append(path, true))
 }
 
-// walk computes a table of byte encodings, thus making huffman access O(1)
+// walk pre computes a table of byte encodings, thus making huffman access O(1)
 func (h *huffman) walk() map[byte][]bool {
 	table := make(map[byte][]bool, 256)
 	dfs(table, h, nil)
 	return table
+}
+
+// walkWith returns the byte encoded inside the huffman tree by consuming
+// exactly as many bits as necessary. Errors on no valid encoding endpoint
+// found or with io.EOF if reader is exhausted
+func (h *huffman) walkWith(br *bitreader.BitReader) (byte, error) {
+	node := h
+
+	for {
+		if node == nil {
+			return 0x0, errors.New("invalid bit stream, reached nul node before decoding a byte")
+		}
+
+		if node.HasKey {
+			break
+		}
+
+		bit, err := br.ReadBit()
+		if err != nil {
+			return 0x0, err
+		}
+
+		if bit {
+			node = node.R
+		} else {
+			node = node.L
+		}
+	}
+
+	return node.Key, nil
 }
 
 type prioQueue []*huffman
@@ -140,33 +177,50 @@ func (f *frequency) deserialize(r *bufio.Reader) error {
 }
 
 // computes the frequency map from a list of bytes
-func (f *frequency) compute(r *bufio.Reader) error {
+func (f *frequency) compute(r *bufio.Reader) (int32, error) {
 	f.M = map[byte]int32{}
+	l := int32(0)
 	for {
 		c, err := r.ReadByte()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			} else {
-				return err
+				return 0, err
 			}
 		}
+		l++
 		if val, ok := f.M[c]; ok {
 			f.M[c] = val + 1
 		} else {
 			f.M[c] = 1
 		}
 	}
-	return nil
+	return l, nil
 }
 
+// tree builds a huffman tree out of the frequency, the root being the return value
 func (f *frequency) tree() *huffman {
 	p := &prioQueue{}
-	for k, v := range f.M {
+
+	// this is needed to make the map access deterministic
+	keys := make([]byte, 0, len(f.M))
+	for k := range f.M {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		// Primary: lower frequency first
+		if f.M[keys[i]] != f.M[keys[j]] {
+			return f.M[keys[i]] < f.M[keys[j]]
+		}
+		return keys[i] < keys[j]
+	})
+
+	for _, k := range keys {
 		p.push(&huffman{
-			hasKey:    true,
+			HasKey:    true,
 			Key:       k,
-			Frequency: v,
+			Frequency: f.M[k],
 		})
 	}
 
@@ -175,7 +229,7 @@ func (f *frequency) tree() *huffman {
 		r := p.pull()
 
 		p.push(&huffman{
-			hasKey:    false,
+			HasKey:    false,
 			Frequency: l.Frequency + r.Frequency,
 			L:         l,
 			R:         r,
@@ -191,7 +245,7 @@ func Compress(r io.Reader, w io.Writer) error {
 	b := &bytes.Buffer{}
 	tee := bufio.NewReader(io.TeeReader(r, b))
 	f := frequency{}
-	err := f.compute(tee)
+	size, err := f.compute(tee)
 	if err != nil {
 		return nil
 	}
@@ -199,14 +253,24 @@ func Compress(r io.Reader, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if err := binary.Write(w, binary.BigEndian, int32(size)); err != nil {
+		return err
+	}
+
 	h := f.tree().walk()
 	bWriter := bitwriter.New(w)
 	for _, b := range b.Bytes() {
 		path := h[b]
 		bWriter.WriteBits(path)
 	}
-	bWriter.Flush()
-	return nil
+
+	return bWriter.Flush()
+}
+
+func debug[T any](t T) T {
+	out, _ := json.MarshalIndent(t, "", "\t")
+	fmt.Println(string(out))
+	return t
 }
 
 func Decompress(r io.Reader, w io.Writer) error {
@@ -225,7 +289,38 @@ func Decompress(r io.Reader, w io.Writer) error {
 		return err
 	}
 
-	// tree := f.tree()
+	var originalLength int32
+	if err := binary.Read(buf, binary.BigEndian, &originalLength); err != nil {
+		return err
+	}
+
+	if originalLength == 0 {
+		_, err := w.Write([]byte{})
+		return err
+	}
+
+	tree := f.tree()
+	br := bitreader.New(buf)
+	byteBuffer := bytes.Buffer{}
+	for range originalLength {
+		b, err := tree.walkWith(br)
+		if err != nil {
+			if err != io.EOF {
+				return err
+			}
+			break
+		}
+		byteBuffer.WriteByte(b)
+	}
+
+	actualWriteSize, err := byteBuffer.WriteTo(w)
+	if err != nil {
+		return err
+	}
+
+	if actualWriteSize != int64(originalLength) {
+		return errors.New("Failed to write the whole decompressed buffer to the writer")
+	}
 
 	return nil
 }

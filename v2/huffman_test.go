@@ -6,12 +6,10 @@ package v2
 import (
 	"bufio"
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
-	"unicode"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -23,28 +21,27 @@ func tDisplay(tree *huffman) string {
 
 func TestPriorityQueue(t *testing.T) {
 	p := prioQueue{}
-	p.push(&huffman{Key: 0x0, Frequency: 0x12})
-	p.push(&huffman{Key: 0x1, Frequency: 0x3})
-	p.push(&huffman{Key: 0xA, Frequency: 0x25})
-	assert.Len(t, p, 3)
-	h := p.pull()
-	assert.Equal(t, h.Key, byte(0x1))
-	assert.Equal(t, h.Frequency, byte(0x3))
-	assert.Len(t, p, 2)
-	h = p.pull()
-	assert.Equal(t, h.Key, byte(0x0))
-	assert.Equal(t, h.Frequency, byte(0x12))
-	assert.Len(t, p, 1)
-	h = p.pull()
-	assert.Equal(t, h.Key, byte(0xA))
-	assert.Equal(t, h.Frequency, byte(0x25))
-	assert.Len(t, p, 0)
+	p.push(&huffman{Key: 0x0, Frequency: 1})
+	p.push(&huffman{Key: 0x1, Frequency: 2})
+	p.push(&huffman{Key: 0xA, Frequency: 3})
+	l := 3
+	compare := func(key byte, f int32) {
+		h := p.pull()
+		assert.Equal(t, h.Key, key)
+		assert.Equal(t, h.Frequency, f)
+		l -= 1
+		assert.Len(t, p, l)
+	}
+	compare(0x0, 1)
+	compare(0x1, 2)
+	compare(0xA, 3)
 }
 
 func TestFrequency(t *testing.T) {
 	in := bufio.NewReader(strings.NewReader("BCAADDDCCACACAC"))
 	f := frequency{}
-	assert.NoError(t, f.compute(in))
+	_, err := f.compute(in)
+	assert.NoError(t, err)
 	m := make(map[byte]int32, len(f.M))
 	for k, v := range f.M {
 		m[k] = v
@@ -59,7 +56,8 @@ func TestFrequency(t *testing.T) {
 func TestTree(t *testing.T) {
 	in := bufio.NewReader(strings.NewReader("BCAADDDCCACACAC"))
 	f := frequency{}
-	assert.NoError(t, f.compute(in))
+	_, err := f.compute(in)
+	assert.NoError(t, err)
 	tree := f.tree()
 	fmt.Println(tDisplay(tree))
 }
@@ -67,7 +65,8 @@ func TestTree(t *testing.T) {
 func TestTreeTable(t *testing.T) {
 	in := bufio.NewReader(strings.NewReader("BCAADDDCCACACAC"))
 	f := frequency{}
-	assert.NoError(t, f.compute(in))
+	_, err := f.compute(in)
+	assert.NoError(t, err)
 	table := f.tree().walk()
 	fmt.Printf("%#+v\n", table)
 }
@@ -77,19 +76,54 @@ func TestHuffman(t *testing.T) {
 		"ABC",
 		"BCAADDDCCACACAC",
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-		// strings.Repeat("1111111111111111111111111111111111", 256),
+		"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		"ABABABABABABABABABABABABABABABABABAB",
+		"The quick brown fox jumps over the lazy dog",
+		"0123456789!@#$%^&*()_+-=[]{}|;':,.<>/?",
+		"",
+		"A",
+		"漢字テスト日本語",
+		strings.Repeat("GoLangIsAwesome!", 100),
 	}
 
 	for _, test := range input {
-		inBuf := strings.NewReader(test)
-		outBuf := bytes.Buffer{}
-		err := Compress(inBuf, &outBuf)
-		assert.NoError(t, err, "Failed to compress buffer")
-		fmt.Printf("len in: %d, len out: %d\n", len([]byte(test)), outBuf.Len())
+		t.Run(test[:min(50, len(test))], func(t *testing.T) {
+			inBuf := strings.NewReader(test)
+			outBuf := bytes.Buffer{}
+			err := Compress(inBuf, &outBuf)
+			assert.NoError(t, err, "Failed to compress buffer")
+			outBuf2 := bytes.Buffer{}
+			err = Decompress(&outBuf, &outBuf2)
+			assert.NoError(t, err)
 
-		outBuf2 := bytes.Buffer{}
-		err = Decompress(&outBuf, &outBuf2)
-		assert.NoError(t, err)
-		// assert.Equal(t, []byte(test), outBuf2.Bytes())
+			got := outBuf2.Bytes()
+			expected := []byte(test)
+			if got == nil {
+				got = []byte{}
+			}
+			assert.Equal(t, expected, got)
+		})
+	}
+}
+
+func TestReadme(t *testing.T) {
+	textThatShouldBeCompressed := strings.Repeat("HelloWorld", 1024)
+	input := strings.NewReader(textThatShouldBeCompressed)
+	compressedBuffer := bytes.Buffer{}
+	err := Compress(input, &compressedBuffer)
+	if err != nil {
+		panic("failed to compress input: " + err.Error())
+	}
+
+	fmt.Printf("compressed=%d;original=%d;ratio=%f\n",
+		compressedBuffer.Len(),
+		len(textThatShouldBeCompressed),
+		float32(len(textThatShouldBeCompressed))/float32(compressedBuffer.Len()),
+	)
+
+	decompressedBuffer := bytes.Buffer{}
+	err = Decompress(&compressedBuffer, &decompressedBuffer)
+	if err != nil {
+		panic("failed to decompress buffer: " + err.Error())
 	}
 }
